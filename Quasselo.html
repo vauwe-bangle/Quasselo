@@ -24,7 +24,7 @@
         <div class="control-bar">
             <button id="btnMenu" class="btn-control" title="Menü">☰</button>
             <button id="btnHoren" class="btn-control btn-horen" title="Vorlesen starten">🔊 Hören</button>
-            <button id="btnPlay" class="btn-control btn-play" title="Play/Pause">▶️</button>
+            <button id="btnPlay" class="btn-control btn-play-pause" title="Play/Pause">⏯️</button>
             <button id="btnStop" class="btn-control btn-stop" title="Stop">⏹️</button>
             <button id="btnBegin" class="btn-control" title="Zum Satzanfang">⏮️</button>
             <button id="btnPrev" class="btn-control" title="Wort zurück">◀️</button>
@@ -36,6 +36,7 @@
             <input type="number" id="jumpPosition" class="jump-input" min="1" placeholder="Pos" title="Zur Position springen">
             
             <button id="btnNext" class="btn-control" title="Wort vor">▶️</button>
+            <button id="btnRepeat" class="btn-control btn-repeat" title="Wort wiederholen">🔁</button>
             <button id="btnEnd" class="btn-control" title="Zum Satzende">⏭️</button>
             <button id="btnClose" class="btn-control" title="Zum Anfang">✖️</button>
         </div>
@@ -47,6 +48,44 @@ Das Schaf José baut eine Sandburg
 José steht auf dem Deich und guckt den Kindern beim Spielen zu. Er schaut ihnen gerne dabei zu, wie sie durch den Sand rennen und im Wasser planschen. Noch lieber wäre er allerdings selbst dabei.
 
 Heute ist ganz schön was los am Strand, obwohl das Wetter nicht besonders gut ist. Der Himmel ist grau und es nieselt. José in seiner dicken Wolle macht das natürlich nichts aus. Die Kinder in ihren bunten Regenjacken scheint das Wetter auch nicht zu stören. José kneift die Augen zusammen und presst die Nase an den Maschendrahtzaun. Was machen die da nur? Heute wird nicht gerannt und geplanscht, die Kinder hocken allein oder in kleinen Grüppchen zusammen und graben im Sand. Vielleicht eine Schatzsuche?
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Einstellungen</h2>
+                <button class="close-btn" id="closeSettings">✖️</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label for="speedSlider">Sprechgeschwindigkeit:</label>
+                    <div class="speed-control">
+                        <span class="speed-label">🐢</span>
+                        <input type="range" id="speedSlider" min="0.5" max="2.0" step="0.1" value="0.9">
+                        <span class="speed-label">🐰</span>
+                    </div>
+                    <div class="speed-value">
+                        <span id="speedValue">0.9</span>x
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <label for="pauseSlider">Sprechflüssigkeit:</label>
+                    <div class="speed-control">
+                        <span class="speed-label">🎯</span>
+                        <input type="range" id="pauseSlider" min="0" max="2000" step="100" value="300">
+                        <span class="speed-label">🐌</span>
+                    </div>
+                    <div class="speed-value">
+                        <span id="pauseValue">300</span> ms
+                    </div>
+                    <div class="setting-hint">
+                        ← Flüssig (mehrere Wörter) | Wort für Wort →
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -11,6 +11,8 @@ class Quasselo {
         this.isPaused = false;
         this.currentSentenceStart = 0;
         this.currentSentenceEnd = 0;
+        this.speechRate = 0.9; // Speech speed
+        this.pauseDuration = 300; // Pause between words in ms
         
         // TTS
         this.utterance = null;
@@ -38,8 +40,17 @@ class Quasselo {
         this.btnBegin = document.getElementById('btnBegin');
         this.btnPrev = document.getElementById('btnPrev');
         this.btnNext = document.getElementById('btnNext');
+        this.btnRepeat = document.getElementById('btnRepeat');
         this.btnEnd = document.getElementById('btnEnd');
         this.btnClose = document.getElementById('btnClose');
+        
+        // Settings Modal
+        this.settingsModal = document.getElementById('settingsModal');
+        this.closeSettingsBtn = document.getElementById('closeSettings');
+        this.speedSlider = document.getElementById('speedSlider');
+        this.speedValue = document.getElementById('speedValue');
+        this.pauseSlider = document.getElementById('pauseSlider');
+        this.pauseValue = document.getElementById('pauseValue');
         
         this.fileInput = document.getElementById('fileInput');
         
@@ -65,6 +76,7 @@ class Quasselo {
         this.btnBegin.addEventListener('click', () => this.jumpToSentenceStart());
         this.btnPrev.addEventListener('click', () => this.previousWord());
         this.btnNext.addEventListener('click', () => this.nextWord());
+        this.btnRepeat.addEventListener('click', () => this.repeatWord());
         this.btnEnd.addEventListener('click', () => this.jumpToSentenceEnd());
         this.btnClose.addEventListener('click', () => this.resetToStart());
         
@@ -83,6 +95,22 @@ class Quasselo {
                 this.isPrepared = false;
                 this.updateUI();
             }
+        });
+        
+        // Settings Modal
+        this.closeSettingsBtn.addEventListener('click', () => this.closeSettings());
+        this.settingsModal.addEventListener('click', (e) => {
+            if (e.target === this.settingsModal) {
+                this.closeSettings();
+            }
+        });
+        this.speedSlider.addEventListener('input', (e) => {
+            this.speechRate = parseFloat(e.target.value);
+            this.speedValue.textContent = this.speechRate.toFixed(1);
+        });
+        this.pauseSlider.addEventListener('input', (e) => {
+            this.pauseDuration = parseInt(e.target.value);
+            this.pauseValue.textContent = this.pauseDuration;
         });
     }
     
@@ -308,7 +336,23 @@ class Quasselo {
             return;
         }
         
-        const word = this.words[this.currentIndex];
+        // Determine how many words to speak together based on pause duration
+        // Shorter pause = more words together = more fluent
+        let wordsToSpeak = 1;
+        if (this.pauseDuration <= 300) {
+            wordsToSpeak = 5; // Very fluent
+        } else if (this.pauseDuration <= 600) {
+            wordsToSpeak = 3; // Medium fluent
+        } else if (this.pauseDuration <= 1000) {
+            wordsToSpeak = 2; // Less fluent
+        } else {
+            wordsToSpeak = 1; // Word by word
+        }
+        
+        // Get the words to speak
+        const endIndex = Math.min(this.currentIndex + wordsToSpeak, this.words.length);
+        const textToSpeak = this.words.slice(this.currentIndex, endIndex).join(' ');
+        
         this.currentPosDisplay.textContent = this.currentIndex + 1;
         this.highlightWord(this.currentIndex);
         
@@ -316,16 +360,29 @@ class Quasselo {
         this.synth.cancel();
         
         // Create new utterance
-        this.utterance = new SpeechSynthesisUtterance(word);
+        this.utterance = new SpeechSynthesisUtterance(textToSpeak);
         this.utterance.lang = 'de-DE';
-        this.utterance.rate = 0.9;
+        this.utterance.rate = this.speechRate;
         this.utterance.pitch = 1;
+        
+        // Track word boundaries for highlighting during speech
+        let wordBoundaryIndex = this.currentIndex;
+        this.utterance.onboundary = (event) => {
+            if (event.name === 'word' && wordBoundaryIndex < endIndex) {
+                this.highlightWord(wordBoundaryIndex);
+                this.currentPosDisplay.textContent = wordBoundaryIndex + 1;
+                wordBoundaryIndex++;
+            }
+        };
         
         this.utterance.onend = () => {
             if (this.isPlaying) {
-                this.currentIndex++;
+                this.currentIndex = endIndex;
                 this.calculateSentenceBoundaries();
-                setTimeout(() => this.speakCurrentWord(), 300);
+                
+                // Small pause between chunks (only for word-by-word mode)
+                const chunkPause = wordsToSpeak === 1 ? this.pauseDuration : 100;
+                setTimeout(() => this.speakCurrentWord(), chunkPause);
             }
         };
         
@@ -364,6 +421,14 @@ class Quasselo {
             // Speak the word
             this.speakSingleWord();
         }
+    }
+    
+    repeatWord() {
+        if (!this.isPrepared) return;
+        
+        // Simply speak the current word again
+        this.currentPosDisplay.textContent = this.currentIndex + 1;
+        this.speakSingleWord();
     }
     
     jumpToSentenceStart() {
@@ -420,7 +485,7 @@ class Quasselo {
         this.synth.cancel();
         const utterance = new SpeechSynthesisUtterance(word);
         utterance.lang = 'de-DE';
-        utterance.rate = 0.9;
+        utterance.rate = this.speechRate;
         this.synth.speak(utterance);
     }
     
@@ -481,10 +546,22 @@ class Quasselo {
             this.btnPrepareActive.style.display = 'none';
         }
         
+        // Update Play/Pause button appearance
+        this.btnPlay.classList.remove('playing', 'paused');
+        if (this.isPlaying) {
+            this.btnPlay.classList.add('playing');
+            this.btnPlay.title = 'Pause';
+        } else if (this.isPaused) {
+            this.btnPlay.classList.add('paused');
+            this.btnPlay.title = 'Fortsetzen';
+        } else {
+            this.btnPlay.title = 'Play';
+        }
+        
         // Enable/disable controls
         const needsPrepared = [
             this.btnHoren, this.btnPlay, this.btnStop,
-            this.btnBegin, this.btnPrev, this.btnNext,
+            this.btnBegin, this.btnPrev, this.btnNext, this.btnRepeat,
             this.btnEnd, this.btnClose, this.btnExport
         ];
         
@@ -496,7 +573,11 @@ class Quasselo {
     }
     
     showMenu() {
-        alert('Menü-Funktion noch nicht implementiert');
+        this.settingsModal.classList.add('show');
+    }
+    
+    closeSettings() {
+        this.settingsModal.classList.remove('show');
     }
     
     showMessage(message) {

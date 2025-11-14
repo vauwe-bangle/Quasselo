@@ -1,2 +1,2 @@
 # Quasselo
-Text aus der Zwischeablage wird "aufbereitet" und mit TTS vorgelesen.
+Text aus der Zwischenablage wird "aufbereitet" und mit TTS vorgelesen.
