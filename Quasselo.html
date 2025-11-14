@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quasselo - Text-to-Speech Reader</title>
+    <link rel="stylesheet" href="quasselo.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <input type="text" id="textName" class="text-name" placeholder="Textname eingeben..." value="">
+            <button id="btnClipboard" class="btn-icon" title="Text aus Clipboard laden">➕</button>
+            <button id="btnSave" class="btn-icon" title="Als TXT speichern">💾</button>
+            <button id="btnPrepare" class="btn-icon" title="Text aufbereiten">✏️</button>
+            <button id="btnPrepareActive" class="btn-icon btn-prepare-active" title="Text ist aufbereitet" style="display:none;">✏️</button>
+            <button id="btnExport" class="btn-icon" title="Aufbereiteten Text exportieren">⬇️</button>
+            <button id="btnImport" class="btn-icon" title="Aufbereiteten Text importieren">📥</button>
+            <button id="btnDelete" class="btn-icon" title="Alles löschen">🗑️</button>
+        </div>
+
+        <!-- Control Bar -->
+        <div class="control-bar">
+            <button id="btnMenu" class="btn-control" title="Menü">☰</button>
+            <button id="btnHoren" class="btn-control btn-horen" title="Vorlesen starten">🔊 Hören</button>
+            <button id="btnPlay" class="btn-control btn-play" title="Play/Pause">▶️</button>
+            <button id="btnStop" class="btn-control btn-stop" title="Stop">⏹️</button>
+            <button id="btnBegin" class="btn-control" title="Zum Satzanfang">⏮️</button>
+            <button id="btnPrev" class="btn-control" title="Wort zurück">◀️</button>
+            
+            <div class="position-display">
+                <span id="currentPos">0</span> / <span id="totalWords">0</span>
+            </div>
+            
+            <input type="number" id="jumpPosition" class="jump-input" min="1" placeholder="Pos" title="Zur Position springen">
+            
+            <button id="btnNext" class="btn-control" title="Wort vor">▶️</button>
+            <button id="btnEnd" class="btn-control" title="Zum Satzende">⏭️</button>
+            <button id="btnClose" class="btn-control" title="Zum Anfang">✖️</button>
+        </div>
+
+        <!-- Text Display Area -->
+        <div class="text-area" id="textArea" contenteditable="true" spellcheck="false">
+Das Schaf José baut eine Sandburg
+
+José steht auf dem Deich und guckt den Kindern beim Spielen zu. Er schaut ihnen gerne dabei zu, wie sie durch den Sand rennen und im Wasser planschen. Noch lieber wäre er allerdings selbst dabei.
+
+Heute ist ganz schön was los am Strand, obwohl das Wetter nicht besonders gut ist. Der Himmel ist grau und es nieselt. José in seiner dicken Wolle macht das natürlich nichts aus. Die Kinder in ihren bunten Regenjacken scheint das Wetter auch nicht zu stören. José kneift die Augen zusammen und presst die Nase an den Maschendrahtzaun. Was machen die da nur? Heute wird nicht gerannt und geplanscht, die Kinder hocken allein oder in kleinen Grüppchen zusammen und graben im Sand. Vielleicht eine Schatzsuche?
+        </div>
+    </div>
+
+    <!-- Hidden File Input -->
+    <input type="file" id="fileInput" accept=".zip" style="display:none;">
+
+    <script src="quasselo.js"></script>
+</body>
+</html>
