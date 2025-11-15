@@ -47,6 +47,10 @@ body {
     background-color: white;
     cursor: pointer;
     transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
 }
 
 .btn-icon:hover {
@@ -85,6 +89,10 @@ body {
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
 }
 
 .btn-control:hover {
@@ -338,6 +346,45 @@ body {
     color: #666;
     margin-top: 8px;
     font-style: italic;
+}
+
+.voice-selection {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.voice-btn {
+    flex: 1;
+    padding: 15px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    border: 3px solid #ccc;
+    background-color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+}
+
+.voice-btn:hover {
+    background-color: #f0f0f0;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.voice-btn.active {
+    background-color: #4A90E2;
+    color: white;
+    border-color: #4A90E2;
+    transform: scale(1.05);
+}
+
+.voice-btn:active {
+    transform: scale(0.98);
 }
 
 /* Responsive Design */

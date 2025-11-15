@@ -12,7 +12,7 @@ class Quasselo {
         this.currentSentenceStart = 0;
         this.currentSentenceEnd = 0;
         this.speechRate = 0.9; // Speech speed
-        this.pauseDuration = 300; // Pause between words in ms
+        this.voiceGender = 'female'; // Voice gender preference
         
         // TTS
         this.utterance = null;
@@ -49,14 +49,35 @@ class Quasselo {
         this.closeSettingsBtn = document.getElementById('closeSettings');
         this.speedSlider = document.getElementById('speedSlider');
         this.speedValue = document.getElementById('speedValue');
-        this.pauseSlider = document.getElementById('pauseSlider');
-        this.pauseValue = document.getElementById('pauseValue');
+        this.voiceFemaleBtn = document.getElementById('voiceFemale');
+        this.voiceMaleBtn = document.getElementById('voiceMale');
         
         this.fileInput = document.getElementById('fileInput');
         
         // Initialize
         this.attachEventListeners();
         this.updateUI();
+        
+        // Load voices (needed for voice selection)
+        // Mobile browsers need special handling
+        this.voicesLoaded = false;
+        this.loadVoices();
+        
+        // Listen for voices changed event (important for mobile)
+        if ('speechSynthesis' in window) {
+            this.synth.addEventListener('voiceschanged', () => {
+                this.loadVoices();
+            });
+        }
+    }
+    
+    loadVoices() {
+        const voices = this.synth.getVoices();
+        if (voices.length > 0) {
+            this.voicesLoaded = true;
+            console.log('Voices loaded:', voices.length);
+            console.log('Available German voices:', voices.filter(v => v.lang.startsWith('de')));
+        }
     }
     
     attachEventListeners() {
@@ -73,6 +94,13 @@ class Quasselo {
         this.btnHoren.addEventListener('click', () => this.startReading());
         this.btnPlay.addEventListener('click', () => this.togglePlayPause());
         this.btnStop.addEventListener('click', () => this.stopReading());
+        
+        // Add touch events for mobile (with preventDefault to avoid double-firing)
+        this.btnPlay.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.togglePlayPause();
+        }, { passive: false });
+        
         this.btnBegin.addEventListener('click', () => this.jumpToSentenceStart());
         this.btnPrev.addEventListener('click', () => this.previousWord());
         this.btnNext.addEventListener('click', () => this.nextWord());
@@ -108,10 +136,40 @@ class Quasselo {
             this.speechRate = parseFloat(e.target.value);
             this.speedValue.textContent = this.speechRate.toFixed(1);
         });
-        this.pauseSlider.addEventListener('input', (e) => {
-            this.pauseDuration = parseInt(e.target.value);
-            this.pauseValue.textContent = this.pauseDuration;
-        });
+        
+        // Voice selection buttons - mobile-first approach
+        const selectFemaleVoice = () => {
+            this.voiceGender = 'female';
+            this.voiceFemaleBtn.classList.add('active');
+            this.voiceMaleBtn.classList.remove('active');
+            console.log('Voice set to: female');
+            this.showMessage('👩 Weibliche Stimme ausgewählt');
+        };
+        
+        const selectMaleVoice = () => {
+            this.voiceGender = 'male';
+            this.voiceMaleBtn.classList.add('active');
+            this.voiceFemaleBtn.classList.remove('active');
+            console.log('Voice set to: male');
+            this.showMessage('👨 Männliche Stimme ausgewählt');
+        };
+        
+        // Click events
+        this.voiceFemaleBtn.addEventListener('click', selectFemaleVoice);
+        this.voiceMaleBtn.addEventListener('click', selectMaleVoice);
+        
+        // Touch events for mobile (prevent both from firing)
+        this.voiceFemaleBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            selectFemaleVoice();
+        }, { passive: false });
+        
+        this.voiceMaleBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            selectMaleVoice();
+        }, { passive: false });
     }
     
     // ===== TEXT HANDLING =====
@@ -290,7 +348,7 @@ class Quasselo {
         this.calculateSentenceBoundaries();
         this.isPlaying = true;
         this.isPaused = false;
-        this.speakCurrentWord();
+        this.speakEntireText();
         this.updateUI();
     }
     
@@ -301,16 +359,16 @@ class Quasselo {
         }
         
         if (!this.isPlaying && !this.isPaused) {
-            // Start fresh
+            // Start fresh from current position
             this.isPlaying = true;
-            this.speakCurrentWord();
+            this.speakEntireText();
         } else if (this.isPlaying) {
-            // Pause
+            // Pause - save current word index
             this.synth.pause();
             this.isPaused = true;
             this.isPlaying = false;
         } else if (this.isPaused) {
-            // Resume
+            // Resume from paused position
             this.synth.resume();
             this.isPaused = false;
             this.isPlaying = true;
@@ -329,6 +387,71 @@ class Quasselo {
         this.updateUI();
     }
     
+    speakEntireText() {
+        if (this.currentIndex >= this.words.length) {
+            this.stopReading();
+            this.showMessage('✓ Vorlesen beendet');
+            return;
+        }
+        
+        // Get remaining text from current position
+        const remainingText = this.words.slice(this.currentIndex).join(' ');
+        
+        // Cancel any ongoing speech
+        this.synth.cancel();
+        
+        // Create new utterance for entire remaining text
+        this.utterance = new SpeechSynthesisUtterance(remainingText);
+        this.utterance.lang = 'de-DE';
+        this.utterance.rate = this.speechRate;
+        this.utterance.pitch = 1;
+        
+        // Set preferred voice
+        const preferredVoice = this.getPreferredVoice();
+        if (preferredVoice) {
+            this.utterance.voice = preferredVoice;
+        }
+        
+        // Track word boundaries for highlighting
+        let wordBoundaryIndex = this.currentIndex;
+        
+        this.utterance.onboundary = (event) => {
+            if (event.name === 'word' && wordBoundaryIndex < this.words.length) {
+                this.highlightWord(wordBoundaryIndex);
+                this.currentPosDisplay.textContent = wordBoundaryIndex + 1;
+                this.currentIndex = wordBoundaryIndex;
+                wordBoundaryIndex++;
+                this.calculateSentenceBoundaries();
+            }
+        };
+        
+        this.utterance.onend = () => {
+            if (this.isPlaying) {
+                this.currentIndex = this.words.length;
+                this.stopReading();
+                this.showMessage('✓ Vorlesen beendet');
+            }
+        };
+        
+        this.utterance.onpause = () => {
+            // When paused, currentIndex is already set via onboundary
+            console.log('Paused at word index:', this.currentIndex);
+        };
+        
+        this.utterance.onresume = () => {
+            console.log('Resumed from word index:', this.currentIndex);
+        };
+        
+        this.utterance.onerror = (err) => {
+            console.error('Speech error:', err);
+            this.isPlaying = false;
+            this.updateUI();
+        };
+        
+        this.synth.speak(this.utterance);
+    }
+    
+    // Legacy function kept for single word navigation
     speakCurrentWord() {
         if (this.currentIndex >= this.words.length) {
             this.stopReading();
@@ -400,6 +523,12 @@ class Quasselo {
     previousWord() {
         if (!this.isPrepared) return;
         
+        // Stop current playback
+        const wasPlaying = this.isPlaying;
+        this.synth.cancel();
+        this.isPlaying = false;
+        this.isPaused = false;
+        
         if (this.currentIndex > 0) {
             this.currentIndex--;
             this.calculateSentenceBoundaries();
@@ -408,10 +537,18 @@ class Quasselo {
             // Speak the word
             this.speakSingleWord();
         }
+        
+        this.updateUI();
     }
     
     nextWord() {
         if (!this.isPrepared) return;
+        
+        // Stop current playback
+        const wasPlaying = this.isPlaying;
+        this.synth.cancel();
+        this.isPlaying = false;
+        this.isPaused = false;
         
         if (this.currentIndex < this.words.length - 1) {
             this.currentIndex++;
@@ -421,32 +558,55 @@ class Quasselo {
             // Speak the word
             this.speakSingleWord();
         }
+        
+        this.updateUI();
     }
     
     repeatWord() {
         if (!this.isPrepared) return;
         
+        // Stop current playback
+        this.synth.cancel();
+        this.isPlaying = false;
+        this.isPaused = false;
+        
         // Simply speak the current word again
         this.currentPosDisplay.textContent = this.currentIndex + 1;
         this.speakSingleWord();
+        
+        this.updateUI();
     }
     
     jumpToSentenceStart() {
         if (!this.isPrepared) return;
         
+        // Stop current playback
+        this.synth.cancel();
+        this.isPlaying = false;
+        this.isPaused = false;
+        
         this.calculateSentenceBoundaries();
         this.currentIndex = this.currentSentenceStart;
         this.currentPosDisplay.textContent = this.currentIndex + 1;
         this.speakSingleWord();
+        
+        this.updateUI();
     }
     
     jumpToSentenceEnd() {
         if (!this.isPrepared) return;
         
+        // Stop current playback
+        this.synth.cancel();
+        this.isPlaying = false;
+        this.isPaused = false;
+        
         this.calculateSentenceBoundaries();
         this.currentIndex = this.currentSentenceEnd;
         this.currentPosDisplay.textContent = this.currentIndex + 1;
         this.speakSingleWord();
+        
+        this.updateUI();
     }
     
     jumpToPosition() {
@@ -458,11 +618,18 @@ class Quasselo {
             return;
         }
         
+        // Stop current playback
+        this.synth.cancel();
+        this.isPlaying = false;
+        this.isPaused = false;
+        
         this.currentIndex = pos - 1;
         this.calculateSentenceBoundaries();
         this.currentPosDisplay.textContent = this.currentIndex + 1;
         this.speakSingleWord();
         this.jumpPositionInput.value = '';
+        
+        this.updateUI();
     }
     
     resetToStart() {
@@ -486,6 +653,13 @@ class Quasselo {
         const utterance = new SpeechSynthesisUtterance(word);
         utterance.lang = 'de-DE';
         utterance.rate = this.speechRate;
+        
+        // Set preferred voice
+        const preferredVoice = this.getPreferredVoice();
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+        }
+        
         this.synth.speak(utterance);
     }
     
@@ -574,10 +748,141 @@ class Quasselo {
     
     showMenu() {
         this.settingsModal.classList.add('show');
+        
+        // Show available voices for debugging on mobile
+        setTimeout(() => {
+            const voices = this.synth.getVoices();
+            const germanVoices = voices.filter(v => v.lang.startsWith('de'));
+            console.log('=== VOICE DEBUG ===');
+            console.log('Total voices:', voices.length);
+            console.log('German voices:', germanVoices.length);
+            console.log('Current gender:', this.voiceGender);
+            germanVoices.forEach(v => {
+                console.log(`- ${v.name} (${v.lang}) ${v.default ? '[DEFAULT]' : ''}`);
+            });
+        }, 100);
     }
     
     closeSettings() {
         this.settingsModal.classList.remove('show');
+    }
+    
+    getPreferredVoice() {
+        const voices = this.synth.getVoices();
+        
+        if (voices.length === 0) {
+            console.warn('No voices available yet');
+            return null;
+        }
+        
+        // Filter for German voices - try multiple patterns
+        let germanVoices = voices.filter(voice => 
+            voice.lang.startsWith('de-') || 
+            voice.lang === 'de' ||
+            voice.lang.startsWith('DE')
+        );
+        
+        console.log('=== VOICE SELECTION ===');
+        console.log('Total voices:', voices.length);
+        console.log('German voices found:', germanVoices.length);
+        console.log('Requested gender:', this.voiceGender);
+        
+        if (germanVoices.length === 0) {
+            console.warn('No German voices found, using first available voice');
+            return voices[0];
+        }
+        
+        // List all German voices for debugging
+        germanVoices.forEach((v, i) => {
+            console.log(`${i}: ${v.name} (${v.lang})`);
+        });
+        
+        let preferredVoice;
+        
+        if (this.voiceGender === 'female') {
+            // Try multiple strategies to find female voice
+            
+            // Strategy 1: Explicit female markers
+            preferredVoice = germanVoices.find(voice => {
+                const nameLower = voice.name.toLowerCase();
+                return nameLower.includes('female') ||
+                       nameLower.includes('frau') ||
+                       nameLower.includes('woman');
+            });
+            
+            // Strategy 2: Common female names
+            if (!preferredVoice) {
+                preferredVoice = germanVoices.find(voice => {
+                    const nameLower = voice.name.toLowerCase();
+                    return nameLower.includes('anna') ||
+                           nameLower.includes('helena') ||
+                           nameLower.includes('petra') ||
+                           nameLower.includes('katja') ||
+                           nameLower.includes('vicki') ||
+                           nameLower.includes('marlene') ||
+                           nameLower.includes('hedda') ||
+                           nameLower.includes('sabina');
+                });
+            }
+            
+            // Strategy 3: Default German voice (usually female)
+            if (!preferredVoice) {
+                preferredVoice = germanVoices.find(voice => voice.default);
+            }
+            
+            // Strategy 4: Avoid male voices
+            if (!preferredVoice) {
+                preferredVoice = germanVoices.find(voice => {
+                    const nameLower = voice.name.toLowerCase();
+                    return !nameLower.includes('male') &&
+                           !nameLower.includes('mann') &&
+                           !nameLower.includes('hans') &&
+                           !nameLower.includes('markus') &&
+                           !nameLower.includes('stefan');
+                });
+            }
+            
+            // Strategy 5: First German voice
+            if (!preferredVoice) {
+                preferredVoice = germanVoices[0];
+            }
+            
+        } else {
+            // Male voice selection
+            
+            // Strategy 1: Explicit male markers
+            preferredVoice = germanVoices.find(voice => {
+                const nameLower = voice.name.toLowerCase();
+                return nameLower.includes('male') ||
+                       nameLower.includes('mann') ||
+                       nameLower.includes('man');
+            });
+            
+            // Strategy 2: Common male names
+            if (!preferredVoice) {
+                preferredVoice = germanVoices.find(voice => {
+                    const nameLower = voice.name.toLowerCase();
+                    return nameLower.includes('hans') ||
+                           nameLower.includes('markus') ||
+                           nameLower.includes('stefan') ||
+                           nameLower.includes('dieter') ||
+                           nameLower.includes('daniel');
+                });
+            }
+            
+            // Strategy 3: Last German voice (often male on some systems)
+            if (!preferredVoice && germanVoices.length > 1) {
+                preferredVoice = germanVoices[germanVoices.length - 1];
+            }
+            
+            // Strategy 4: Fallback to first
+            if (!preferredVoice) {
+                preferredVoice = germanVoices[0];
+            }
+        }
+        
+        console.log('✓ Selected voice:', preferredVoice.name, '(', preferredVoice.lang, ')');
+        return preferredVoice;
     }
     
     showMessage(message) {
