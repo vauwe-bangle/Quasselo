@@ -24,23 +24,30 @@
 
         <!-- Control Bar -->
         <div class="control-bar">
-            <button id="btnMenu" class="btn-control" title="Menü">☰</button>
-            <button id="btnHoren" class="btn-control btn-horen" title="Vorlesen starten">🔊 Hören</button>
-            <button id="btnPlay" class="btn-control btn-play-pause" title="Play/Pause">⏯️</button>
-            <button id="btnStop" class="btn-control btn-stop" title="Stop">⏹️</button>
-            <button id="btnBegin" class="btn-control" title="Zum Satzanfang">⏮️</button>
-            <button id="btnPrev" class="btn-control" title="Wort zurück">◀️</button>
-            
-            <div class="position-display">
-                <span id="currentPos">0</span> / <span id="totalWords">0</span>
+            <!-- First Row -->
+            <div class="control-row control-row-1">
+                <button id="btnMenu" class="btn-control" title="Menü">☰</button>
+                <button id="btnHoren" class="btn-control btn-horen" title="Vorlesen starten">🔊 Hören</button>
+                <button id="btnPlay" class="btn-control btn-play-pause" title="Play/Pause">⏯️</button>
+                <button id="btnStop" class="btn-control btn-stop" title="Stop">⏹️</button>
             </div>
             
-            <input type="number" id="jumpPosition" class="jump-input" min="1" placeholder="Pos" title="Zur Position springen">
-            
-            <button id="btnNext" class="btn-control" title="Wort vor">▶️</button>
-            <button id="btnRepeat" class="btn-control btn-repeat" title="Wort wiederholen">🔁</button>
-            <button id="btnEnd" class="btn-control" title="Zum Satzende">⏭️</button>
-            <button id="btnClose" class="btn-control" title="Zum Anfang">✖️</button>
+            <!-- Second Row -->
+            <div class="control-row control-row-2">
+                <button id="btnBegin" class="btn-control" title="Zum Satzanfang">⏮️</button>
+                <button id="btnPrev" class="btn-control" title="Wort zurück">◀️</button>
+                
+                <div class="position-display">
+                    <span id="currentPos">0</span> / <span id="totalWords">0</span>
+                </div>
+                
+                <input type="number" id="jumpPosition" class="jump-input" min="1" placeholder="Pos" title="Zur Position springen">
+                
+                <button id="btnNext" class="btn-control" title="Wort vor">▶️</button>
+                <button id="btnRepeat" class="btn-control btn-repeat" title="Wort wiederholen">🔁</button>
+                <button id="btnEnd" class="btn-control" title="Zum Satzende">⏭️</button>
+                <button id="btnClose" class="btn-control" title="Zum Anfang">✖️</button>
+            </div>
         </div>
 
         <!-- Text Display Area -->
@@ -74,14 +81,24 @@ Heute ist ganz schön was los am Strand, obwohl das Wetter nicht besonders gut i
                 </div>
                 
                 <div class="setting-group">
-                    <label for="voiceGender">Stimme:</label>
-                    <div class="voice-selection">
-                        <button id="voiceFemale" class="voice-btn active" data-gender="female">
-                            👩 Weiblich
-                        </button>
-                        <button id="voiceMale" class="voice-btn" data-gender="male">
-                            👨 Männlich
-                        </button>
+                    <label for="fontSizeSlider">Schriftgröße:</label>
+                    <div class="speed-control">
+                        <span class="speed-label">A</span>
+                        <input type="range" id="fontSizeSlider" min="14" max="28" step="2" value="18">
+                        <span class="speed-label" style="font-size: 24px;">A</span>
+                    </div>
+                    <div class="speed-value">
+                        <span id="fontSizeValue">18</span> px
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <label for="voiceSelect">Stimme:</label>
+                    <select id="voiceSelect" class="voice-select">
+                        <option value="">Stimmen werden geladen...</option>
+                    </select>
+                    <div class="voice-info" id="voiceInfo">
+                        Wähle eine deutsche Stimme aus der Liste
                     </div>
                 </div>
             </div>

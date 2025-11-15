@@ -72,12 +72,42 @@ body {
 .control-bar {
     background-color: #d3d3d3;
     border-bottom: 3px solid #000;
+    padding: 8px;
+}
+
+.control-row {
     display: flex;
     align-items: center;
-    padding: 8px;
     gap: 5px;
     flex-wrap: wrap;
     justify-content: center;
+}
+
+.control-row-1 {
+    margin-bottom: 0;
+}
+
+.control-row-2 {
+    /* Second row styles */
+}
+
+/* Desktop: Single row layout */
+@media (min-width: 769px) {
+    .control-bar {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .control-row {
+        display: contents; /* Makes children behave as direct children of control-bar */
+    }
+    
+    .control-row-1 {
+        margin-bottom: 0;
+    }
 }
 
 .btn-control {
@@ -113,6 +143,9 @@ body {
     background-color: #E8E8E8;
     font-weight: bold;
     transition: background-color 0.3s;
+    /* Extra mobile touch optimization */
+    -webkit-tap-highlight-color: rgba(0,0,0,0.1);
+    -webkit-touch-callout: none;
 }
 
 .btn-play-pause.playing {
@@ -348,6 +381,33 @@ body {
     font-style: italic;
 }
 
+.voice-select {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 2px solid #4A90E2;
+    border-radius: 5px;
+    background-color: white;
+    cursor: pointer;
+    font-family: Arial, sans-serif;
+}
+
+.voice-select:focus {
+    outline: none;
+    border-color: #2E5C8A;
+    box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+}
+
+.voice-info {
+    margin-top: 8px;
+    padding: 8px;
+    background-color: #F0F8FF;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #4A90E2;
+    text-align: center;
+}
+
 .voice-selection {
     display: flex;
     gap: 10px;
@@ -391,6 +451,18 @@ body {
 @media (max-width: 768px) {
     .container {
         border-width: 2px;
+    }
+    
+    .control-bar {
+        padding: 5px;
+    }
+    
+    .control-row {
+        gap: 3px;
+    }
+    
+    .control-row-1 {
+        margin-bottom: 5px;
     }
     
     .top-bar, .control-bar {

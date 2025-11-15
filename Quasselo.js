@@ -12,7 +12,12 @@ class Quasselo {
         this.currentSentenceStart = 0;
         this.currentSentenceEnd = 0;
         this.speechRate = 0.9; // Speech speed
-        this.voiceGender = 'female'; // Voice gender preference
+        this.selectedVoice = null; // Selected voice object
+        this.fontSize = 18; // Font size in pixels
+        
+        // Debounce for Play/Pause button
+        this.playPauseTimeout = null;
+        this.playPauseBlocked = false;
         
         // TTS
         this.utterance = null;
@@ -49,8 +54,10 @@ class Quasselo {
         this.closeSettingsBtn = document.getElementById('closeSettings');
         this.speedSlider = document.getElementById('speedSlider');
         this.speedValue = document.getElementById('speedValue');
-        this.voiceFemaleBtn = document.getElementById('voiceFemale');
-        this.voiceMaleBtn = document.getElementById('voiceMale');
+        this.fontSizeSlider = document.getElementById('fontSizeSlider');
+        this.fontSizeValue = document.getElementById('fontSizeValue');
+        this.voiceSelect = document.getElementById('voiceSelect');
+        this.voiceInfo = document.getElementById('voiceInfo');
         
         this.fileInput = document.getElementById('fileInput');
         
@@ -76,7 +83,44 @@ class Quasselo {
         if (voices.length > 0) {
             this.voicesLoaded = true;
             console.log('Voices loaded:', voices.length);
-            console.log('Available German voices:', voices.filter(v => v.lang.startsWith('de')));
+            
+            // Filter German voices
+            const germanVoices = voices.filter(v => 
+                v.lang.startsWith('de-') || v.lang === 'de' || v.lang.startsWith('DE')
+            );
+            
+            console.log('German voices:', germanVoices.length);
+            
+            // Populate dropdown
+            this.voiceSelect.innerHTML = '';
+            
+            if (germanVoices.length === 0) {
+                this.voiceSelect.innerHTML = '<option value="">Keine deutschen Stimmen verfügbar</option>';
+                this.voiceInfo.textContent = '⚠ Keine deutschen Stimmen gefunden';
+                return;
+            }
+            
+            germanVoices.forEach((voice, index) => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                
+                // Select first voice by default
+                if (index === 0) {
+                    option.selected = true;
+                    this.selectedVoice = voice;
+                }
+                
+                this.voiceSelect.appendChild(option);
+            });
+            
+            this.voiceInfo.textContent = `${germanVoices.length} deutsche Stimme(n) verfügbar`;
+            
+            // Log all voices for debugging
+            console.log('Available German voices:');
+            germanVoices.forEach(v => {
+                console.log(`- ${v.name} (${v.lang})`);
+            });
         }
     }
     
@@ -92,15 +136,28 @@ class Quasselo {
         // Control bar buttons
         this.btnMenu.addEventListener('click', () => this.showMenu());
         this.btnHoren.addEventListener('click', () => this.startReading());
-        this.btnPlay.addEventListener('click', () => this.togglePlayPause());
-        this.btnStop.addEventListener('click', () => this.stopReading());
         
-        // Add touch events for mobile (with preventDefault to avoid double-firing)
-        this.btnPlay.addEventListener('touchstart', (e) => {
+        // Play/Pause - debounced to prevent double-firing on mobile
+        this.btnPlay.addEventListener('click', (e) => {
             e.preventDefault();
+            e.stopPropagation();
+            
+            // Prevent rapid double-clicks
+            if (this.playPauseBlocked) {
+                console.log('Play/Pause blocked - too fast');
+                return;
+            }
+            
+            this.playPauseBlocked = true;
             this.togglePlayPause();
-        }, { passive: false });
+            
+            // Unblock after 300ms
+            setTimeout(() => {
+                this.playPauseBlocked = false;
+            }, 300);
+        });
         
+        this.btnStop.addEventListener('click', () => this.stopReading());
         this.btnBegin.addEventListener('click', () => this.jumpToSentenceStart());
         this.btnPrev.addEventListener('click', () => this.previousWord());
         this.btnNext.addEventListener('click', () => this.nextWord());
@@ -137,39 +194,23 @@ class Quasselo {
             this.speedValue.textContent = this.speechRate.toFixed(1);
         });
         
-        // Voice selection buttons - mobile-first approach
-        const selectFemaleVoice = () => {
-            this.voiceGender = 'female';
-            this.voiceFemaleBtn.classList.add('active');
-            this.voiceMaleBtn.classList.remove('active');
-            console.log('Voice set to: female');
-            this.showMessage('👩 Weibliche Stimme ausgewählt');
-        };
+        this.fontSizeSlider.addEventListener('input', (e) => {
+            this.fontSize = parseInt(e.target.value);
+            this.fontSizeValue.textContent = this.fontSize;
+            this.textArea.style.fontSize = this.fontSize + 'px';
+        });
         
-        const selectMaleVoice = () => {
-            this.voiceGender = 'male';
-            this.voiceMaleBtn.classList.add('active');
-            this.voiceFemaleBtn.classList.remove('active');
-            console.log('Voice set to: male');
-            this.showMessage('👨 Männliche Stimme ausgewählt');
-        };
-        
-        // Click events
-        this.voiceFemaleBtn.addEventListener('click', selectFemaleVoice);
-        this.voiceMaleBtn.addEventListener('click', selectMaleVoice);
-        
-        // Touch events for mobile (prevent both from firing)
-        this.voiceFemaleBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            selectFemaleVoice();
-        }, { passive: false });
-        
-        this.voiceMaleBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            selectMaleVoice();
-        }, { passive: false });
+        // Voice selection dropdown
+        this.voiceSelect.addEventListener('change', (e) => {
+            const voiceName = e.target.value;
+            const voices = this.synth.getVoices();
+            this.selectedVoice = voices.find(v => v.name === voiceName);
+            
+            if (this.selectedVoice) {
+                this.voiceInfo.textContent = `✓ ${this.selectedVoice.name} ausgewählt`;
+                console.log('Voice selected:', this.selectedVoice.name);
+            }
+        });
     }
     
     // ===== TEXT HANDLING =====
@@ -353,6 +394,11 @@ class Quasselo {
     }
     
     togglePlayPause() {
+        console.log('=== togglePlayPause called ===');
+        console.log('isPrepared:', this.isPrepared);
+        console.log('isPlaying:', this.isPlaying);
+        console.log('isPaused:', this.isPaused);
+        
         if (!this.isPrepared) {
             this.showMessage('⚠ Text muss erst aufbereitet werden');
             return;
@@ -360,21 +406,25 @@ class Quasselo {
         
         if (!this.isPlaying && !this.isPaused) {
             // Start fresh from current position
+            console.log('→ Starting fresh');
             this.isPlaying = true;
             this.speakEntireText();
         } else if (this.isPlaying) {
             // Pause - save current word index
+            console.log('→ Pausing');
             this.synth.pause();
             this.isPaused = true;
             this.isPlaying = false;
         } else if (this.isPaused) {
             // Resume from paused position
+            console.log('→ Resuming');
             this.synth.resume();
             this.isPaused = false;
             this.isPlaying = true;
         }
         
         this.updateUI();
+        console.log('After toggle - isPlaying:', this.isPlaying, 'isPaused:', this.isPaused);
     }
     
     stopReading() {
@@ -749,18 +799,8 @@ class Quasselo {
     showMenu() {
         this.settingsModal.classList.add('show');
         
-        // Show available voices for debugging on mobile
-        setTimeout(() => {
-            const voices = this.synth.getVoices();
-            const germanVoices = voices.filter(v => v.lang.startsWith('de'));
-            console.log('=== VOICE DEBUG ===');
-            console.log('Total voices:', voices.length);
-            console.log('German voices:', germanVoices.length);
-            console.log('Current gender:', this.voiceGender);
-            germanVoices.forEach(v => {
-                console.log(`- ${v.name} (${v.lang}) ${v.default ? '[DEFAULT]' : ''}`);
-            });
-        }, 100);
+        // Reload voices when settings are opened (important for mobile)
+        this.loadVoices();
     }
     
     closeSettings() {
@@ -768,121 +808,23 @@ class Quasselo {
     }
     
     getPreferredVoice() {
-        const voices = this.synth.getVoices();
-        
-        if (voices.length === 0) {
-            console.warn('No voices available yet');
-            return null;
+        // Return the user-selected voice, or first German voice as fallback
+        if (this.selectedVoice) {
+            return this.selectedVoice;
         }
         
-        // Filter for German voices - try multiple patterns
-        let germanVoices = voices.filter(voice => 
-            voice.lang.startsWith('de-') || 
-            voice.lang === 'de' ||
-            voice.lang.startsWith('DE')
+        const voices = this.synth.getVoices();
+        const germanVoices = voices.filter(v => 
+            v.lang.startsWith('de-') || v.lang === 'de' || v.lang.startsWith('DE')
         );
         
-        console.log('=== VOICE SELECTION ===');
-        console.log('Total voices:', voices.length);
-        console.log('German voices found:', germanVoices.length);
-        console.log('Requested gender:', this.voiceGender);
-        
-        if (germanVoices.length === 0) {
-            console.warn('No German voices found, using first available voice');
-            return voices[0];
+        if (germanVoices.length > 0) {
+            this.selectedVoice = germanVoices[0];
+            return germanVoices[0];
         }
         
-        // List all German voices for debugging
-        germanVoices.forEach((v, i) => {
-            console.log(`${i}: ${v.name} (${v.lang})`);
-        });
-        
-        let preferredVoice;
-        
-        if (this.voiceGender === 'female') {
-            // Try multiple strategies to find female voice
-            
-            // Strategy 1: Explicit female markers
-            preferredVoice = germanVoices.find(voice => {
-                const nameLower = voice.name.toLowerCase();
-                return nameLower.includes('female') ||
-                       nameLower.includes('frau') ||
-                       nameLower.includes('woman');
-            });
-            
-            // Strategy 2: Common female names
-            if (!preferredVoice) {
-                preferredVoice = germanVoices.find(voice => {
-                    const nameLower = voice.name.toLowerCase();
-                    return nameLower.includes('anna') ||
-                           nameLower.includes('helena') ||
-                           nameLower.includes('petra') ||
-                           nameLower.includes('katja') ||
-                           nameLower.includes('vicki') ||
-                           nameLower.includes('marlene') ||
-                           nameLower.includes('hedda') ||
-                           nameLower.includes('sabina');
-                });
-            }
-            
-            // Strategy 3: Default German voice (usually female)
-            if (!preferredVoice) {
-                preferredVoice = germanVoices.find(voice => voice.default);
-            }
-            
-            // Strategy 4: Avoid male voices
-            if (!preferredVoice) {
-                preferredVoice = germanVoices.find(voice => {
-                    const nameLower = voice.name.toLowerCase();
-                    return !nameLower.includes('male') &&
-                           !nameLower.includes('mann') &&
-                           !nameLower.includes('hans') &&
-                           !nameLower.includes('markus') &&
-                           !nameLower.includes('stefan');
-                });
-            }
-            
-            // Strategy 5: First German voice
-            if (!preferredVoice) {
-                preferredVoice = germanVoices[0];
-            }
-            
-        } else {
-            // Male voice selection
-            
-            // Strategy 1: Explicit male markers
-            preferredVoice = germanVoices.find(voice => {
-                const nameLower = voice.name.toLowerCase();
-                return nameLower.includes('male') ||
-                       nameLower.includes('mann') ||
-                       nameLower.includes('man');
-            });
-            
-            // Strategy 2: Common male names
-            if (!preferredVoice) {
-                preferredVoice = germanVoices.find(voice => {
-                    const nameLower = voice.name.toLowerCase();
-                    return nameLower.includes('hans') ||
-                           nameLower.includes('markus') ||
-                           nameLower.includes('stefan') ||
-                           nameLower.includes('dieter') ||
-                           nameLower.includes('daniel');
-                });
-            }
-            
-            // Strategy 3: Last German voice (often male on some systems)
-            if (!preferredVoice && germanVoices.length > 1) {
-                preferredVoice = germanVoices[germanVoices.length - 1];
-            }
-            
-            // Strategy 4: Fallback to first
-            if (!preferredVoice) {
-                preferredVoice = germanVoices[0];
-            }
-        }
-        
-        console.log('✓ Selected voice:', preferredVoice.name, '(', preferredVoice.lang, ')');
-        return preferredVoice;
+        // Ultimate fallback
+        return voices.length > 0 ? voices[0] : null;
     }
     
     showMessage(message) {
