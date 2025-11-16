@@ -40,7 +40,7 @@ class Quasselo {
         this.btnDelete = document.getElementById('btnDelete');
         this.btnMenu = document.getElementById('btnMenu');
         this.btnHoren = document.getElementById('btnHoren');
-        this.btnPlay = document.getElementById('btnPlay');
+        this.btnPause = document.getElementById('btnPause');
         this.btnStop = document.getElementById('btnStop');
         this.btnBegin = document.getElementById('btnBegin');
         this.btnPrev = document.getElementById('btnPrev');
@@ -135,27 +135,12 @@ class Quasselo {
         
         // Control bar buttons
         this.btnMenu.addEventListener('click', () => this.showMenu());
-        this.btnHoren.addEventListener('click', () => this.startReading());
         
-        // Play/Pause - debounced to prevent double-firing on mobile
-        this.btnPlay.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // Prevent rapid double-clicks
-            if (this.playPauseBlocked) {
-                console.log('Play/Pause blocked - too fast');
-                return;
-            }
-            
-            this.playPauseBlocked = true;
-            this.togglePlayPause();
-            
-            // Unblock after 300ms
-            setTimeout(() => {
-                this.playPauseBlocked = false;
-            }, 300);
-        });
+        // Hören button now works as Play/Resume
+        this.btnHoren.addEventListener('click', () => this.playOrResume());
+        
+        // Separate Pause button
+        this.btnPause.addEventListener('click', () => this.pause());
         
         this.btnStop.addEventListener('click', () => this.stopReading());
         this.btnBegin.addEventListener('click', () => this.jumpToSentenceStart());
@@ -379,17 +364,72 @@ class Quasselo {
     
     // ===== TEXT-TO-SPEECH =====
     
-    startReading() {
+    playOrResume() {
+        console.log('=== playOrResume called ===');
+        console.log('State before: isPrepared:', this.isPrepared, 'isPlaying:', this.isPlaying, 'isPaused:', this.isPaused, 'currentIndex:', this.currentIndex);
+        
         if (!this.isPrepared) {
             this.showMessage('⚠ Text muss erst aufbereitet werden');
             return;
         }
         
-        this.currentIndex = 0;
-        this.calculateSentenceBoundaries();
-        this.isPlaying = true;
-        this.isPaused = false;
-        this.speakEntireText();
+        // Always cancel any ongoing speech first
+        this.synth.cancel();
+        
+        if (this.isPaused || !this.isPlaying) {
+            // Start or resume from current position
+            console.log('→ Starting/Resuming playback from index:', this.currentIndex);
+            this.isPaused = false;
+            this.isPlaying = true;
+            
+            // If at the end, restart from beginning
+            if (this.currentIndex >= this.words.length) {
+                this.currentIndex = 0;
+                this.calculateSentenceBoundaries();
+                console.log('→ Restarting from beginning');
+            }
+            
+            try {
+                this.speakEntireText();
+                console.log('✓ Playback started');
+            } catch (e) {
+                console.error('✗ Playback failed:', e);
+                this.isPlaying = false;
+            }
+        } else {
+            console.log('→ Already playing');
+        }
+        
+        console.log('State after: isPlaying:', this.isPlaying, 'isPaused:', this.isPaused);
+        this.updateUI();
+    }
+    
+    pause() {
+        console.log('=== pause called ===');
+        console.log('State before: isPrepared:', this.isPrepared, 'isPlaying:', this.isPlaying, 'isPaused:', this.isPaused);
+        
+        if (!this.isPrepared) {
+            this.showMessage('⚠ Text muss erst aufbereitet werden');
+            return;
+        }
+        
+        if (this.isPlaying) {
+            console.log('→ Pausing playback at index:', this.currentIndex);
+            try {
+                // Mobile workaround: Cancel instead of pause
+                // The current position is already tracked in currentIndex via onboundary
+                this.synth.cancel();
+                this.isPaused = true;
+                this.isPlaying = false;
+                console.log('✓ Pause successful (stopped at word', this.currentIndex + 1, ')');
+            } catch (e) {
+                console.error('✗ Pause failed:', e);
+            }
+        } else {
+            console.log('→ Not playing, cannot pause');
+        }
+        
+        console.log('State after: isPlaying:', this.isPlaying, 'isPaused:', this.isPaused);
         this.updateUI();
     }
     
@@ -438,6 +478,8 @@ class Quasselo {
     }
     
     speakEntireText() {
+        console.log('>>> speakEntireText called, currentIndex:', this.currentIndex, 'words.length:', this.words.length);
+        
         if (this.currentIndex >= this.words.length) {
             this.stopReading();
             this.showMessage('✓ Vorlesen beendet');
@@ -446,6 +488,7 @@ class Quasselo {
         
         // Get remaining text from current position
         const remainingText = this.words.slice(this.currentIndex).join(' ');
+        console.log('Remaining text length:', remainingText.length, 'characters');
         
         // Cancel any ongoing speech
         this.synth.cancel();
@@ -460,6 +503,9 @@ class Quasselo {
         const preferredVoice = this.getPreferredVoice();
         if (preferredVoice) {
             this.utterance.voice = preferredVoice;
+            console.log('Using voice:', preferredVoice.name);
+        } else {
+            console.warn('No voice selected');
         }
         
         // Track word boundaries for highlighting
@@ -475,7 +521,12 @@ class Quasselo {
             }
         };
         
+        this.utterance.onstart = () => {
+            console.log('✓ TTS started speaking');
+        };
+        
         this.utterance.onend = () => {
+            console.log('TTS finished speaking');
             if (this.isPlaying) {
                 this.currentIndex = this.words.length;
                 this.stopReading();
@@ -484,21 +535,24 @@ class Quasselo {
         };
         
         this.utterance.onpause = () => {
-            // When paused, currentIndex is already set via onboundary
-            console.log('Paused at word index:', this.currentIndex);
+            console.log('TTS paused');
         };
         
         this.utterance.onresume = () => {
-            console.log('Resumed from word index:', this.currentIndex);
+            console.log('TTS resumed');
         };
         
         this.utterance.onerror = (err) => {
-            console.error('Speech error:', err);
+            console.error('✗ TTS error:', err);
+            console.error('Error type:', err.error);
+            console.error('Error message:', err.message);
             this.isPlaying = false;
             this.updateUI();
         };
         
+        console.log('Calling synth.speak()...');
         this.synth.speak(this.utterance);
+        console.log('synth.speak() called, speaking:', this.synth.speaking, 'pending:', this.synth.pending);
     }
     
     // Legacy function kept for single word navigation
@@ -770,21 +824,24 @@ class Quasselo {
             this.btnPrepareActive.style.display = 'none';
         }
         
-        // Update Play/Pause button appearance
-        this.btnPlay.classList.remove('playing', 'paused');
-        if (this.isPlaying) {
-            this.btnPlay.classList.add('playing');
-            this.btnPlay.title = 'Pause';
-        } else if (this.isPaused) {
-            this.btnPlay.classList.add('paused');
-            this.btnPlay.title = 'Fortsetzen';
+        // Show/hide Pause button based on playing state
+        // Hören button is always visible
+        if (!this.isPrepared) {
+            // Not prepared: show Pause but disabled
+            this.btnPause.style.visibility = 'visible';
+        } else if (this.isPlaying) {
+            // Currently playing -> show Pause
+            this.btnPause.style.visibility = 'visible';
+            console.log('UI: Showing Pause (playing)');
         } else {
-            this.btnPlay.title = 'Play';
+            // Not playing (paused or stopped) -> hide Pause
+            this.btnPause.style.visibility = 'hidden';
+            console.log('UI: Hiding Pause (not playing)');
         }
         
         // Enable/disable controls
         const needsPrepared = [
-            this.btnHoren, this.btnPlay, this.btnStop,
+            this.btnHoren, this.btnPause, this.btnStop,
             this.btnBegin, this.btnPrev, this.btnNext, this.btnRepeat,
             this.btnEnd, this.btnClose, this.btnExport
         ];
